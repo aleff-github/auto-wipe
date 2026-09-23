@@ -1,4 +1,12 @@
-import { DEFAULT_SETTINGS, SETTING_IDS, normalizeSettings } from "./settings.js";
+import {
+  DATA_SETTING_IDS,
+  DEFAULT_SETTINGS,
+  PRESETS,
+  SETTING_IDS,
+  applyPreset,
+  normalizeProtectedOrigins,
+  normalizeSettings
+} from "./settings.js";
 
 let statusTimer = null;
 
@@ -25,13 +33,74 @@ function setStatus(message, { clearAfter = 0, tone = "neutral" } = {}) {
   }
 }
 
+function getRawProtectedOrigins() {
+  return $("protectedOrigins").value
+    .split(/[\n,]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function readFormSettings() {
+  const next = {};
+
+  for (const id of SETTING_IDS) {
+    next[id] = $(id).checked;
+  }
+
+  next.timeRange = $("timeRange").value;
+  next.schedule = $("schedule").value;
+  next.protectedOrigins = normalizeProtectedOrigins(getRawProtectedOrigins());
+
+  return normalizeSettings(next);
+}
+
+function writeFormSettings(settings) {
+  for (const id of SETTING_IDS) {
+    $(id).checked = settings[id];
+  }
+
+  $("timeRange").value = settings.timeRange;
+  $("schedule").value = settings.schedule;
+  $("protectedOrigins").value = settings.protectedOrigins.join("\n");
+}
+
 function selectedDataCount() {
-  return ["wipeHistory", "wipeCache", "wipeCacheStorage", "wipeDownloads"]
-    .filter((id) => $(id).checked).length;
+  return DATA_SETTING_IDS.filter((id) => $(id).checked).length;
 }
 
 function updateButtonState() {
   $("wipeNow").disabled = selectedDataCount() === 0;
+}
+
+function updateSensitiveWarning() {
+  const hasSensitiveSelection = [
+    "wipeCookies",
+    "wipeLocalStorage",
+    "wipeIndexedDB",
+    "wipeServiceWorkers"
+  ].some((id) => $(id).checked);
+
+  $("siteDataWarning").classList.toggle("hidden", !hasSensitiveSelection);
+}
+
+function updatePresetState() {
+  const current = readFormSettings();
+
+  document.querySelectorAll("[data-preset]").forEach((button) => {
+    const preset = PRESETS[button.dataset.preset];
+    const matches = DATA_SETTING_IDS.every((id) => current[id] === preset[id]);
+    button.setAttribute("aria-pressed", String(matches));
+  });
+}
+
+function updateProtectedCount() {
+  const raw = getRawProtectedOrigins();
+  const normalized = normalizeProtectedOrigins(raw);
+  const ignored = Math.max(0, raw.length - normalized.length);
+
+  $("protectedCount").textContent = normalized.length === 0
+    ? "No protected sites."
+    : `${normalized.length} protected site${normalized.length === 1 ? "" : "s"}${ignored ? ` · ${ignored} invalid or duplicate entr${ignored === 1 ? "y" : "ies"} ignored` : ""}.`;
 }
 
 function formatLastWipe(lastWipe) {
@@ -52,12 +121,22 @@ function formatLastWipe(lastWipe) {
   return `Last wipe · ${when}`;
 }
 
-async function refreshLastWipe() {
+function formatNextSchedule(timestamp) {
+  if (!timestamp) {
+    return "";
+  }
+
+  return `Next scheduled wipe: ${new Date(timestamp).toLocaleString()}`;
+}
+
+async function refreshStatusDetails() {
   try {
     const response = await chrome.runtime.sendMessage({ type: "GET_STATUS" });
     $("lastWipe").textContent = formatLastWipe(response?.lastWipe);
+    $("nextSchedule").textContent = formatNextSchedule(response?.nextScheduledWipe);
   } catch {
     $("lastWipe").textContent = "";
+    $("nextSchedule").textContent = "";
   }
 }
 
@@ -65,31 +144,46 @@ async function loadSettings() {
   const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   const settings = normalizeSettings(stored);
 
-  for (const id of SETTING_IDS) {
-    $(id).checked = settings[id];
-  }
-
-  $("timeRange").value = settings.timeRange;
+  writeFormSettings(settings);
   updateButtonState();
+  updateSensitiveWarning();
+  updatePresetState();
+  updateProtectedCount();
 }
 
-async function saveSettings() {
-  const next = {};
-
-  for (const id of SETTING_IDS) {
-    next[id] = $(id).checked;
-  }
-
-  next.timeRange = $("timeRange").value;
+async function saveSettings({ message = "Settings saved." } = {}) {
+  const rawProtectedOrigins = getRawProtectedOrigins();
+  const settings = readFormSettings();
 
   try {
-    await chrome.storage.sync.set(normalizeSettings(next));
-    setStatus("Settings saved.", { clearAfter: 1400 });
+    await chrome.storage.sync.set(settings);
+    $("protectedOrigins").value = settings.protectedOrigins.join("\n");
+    await chrome.runtime.sendMessage({ type: "SYNC_SCHEDULE" });
+
+    const ignored = Math.max(0, rawProtectedOrigins.length - settings.protectedOrigins.length);
+    setStatus(
+      ignored > 0
+        ? `${message} ${ignored} invalid or duplicate protected-site entr${ignored === 1 ? "y was" : "ies were"} ignored.`
+        : message,
+      { clearAfter: ignored > 0 ? 3500 : 1600 }
+    );
   } catch {
     setStatus("Could not save settings.", { clearAfter: 3000, tone: "error" });
   }
 
   updateButtonState();
+  updateSensitiveWarning();
+  updatePresetState();
+  updateProtectedCount();
+  await refreshStatusDetails();
+}
+
+async function applySelectedPreset(name) {
+  const next = applyPreset(name, readFormSettings());
+  writeFormSettings(next);
+  await saveSettings({
+    message: `${name[0].toUpperCase() + name.slice(1)} preset applied.`
+  });
 }
 
 function setWiping(isWiping) {
@@ -109,10 +203,12 @@ async function wipeNow() {
     if (result?.ok) {
       const count = result.wiped?.length ?? 0;
       setStatus(
-        count > 0 ? `Wipe completed · ${count} data type${count === 1 ? "" : "s"} cleared.` : "Nothing selected to wipe.",
+        count > 0
+          ? `Wipe completed · ${count} data type${count === 1 ? "" : "s"} cleared.`
+          : "Nothing selected to wipe.",
         { clearAfter: 3500, tone: "success" }
       );
-      await refreshLastWipe();
+      await refreshStatusDetails();
     } else {
       setStatus("Wipe failed.", { clearAfter: 4000, tone: "error" });
     }
@@ -125,10 +221,17 @@ async function wipeNow() {
 
 function wireListeners() {
   for (const id of SETTING_IDS) {
-    $(id).addEventListener("change", saveSettings);
+    $(id).addEventListener("change", () => saveSettings());
   }
 
-  $("timeRange").addEventListener("change", saveSettings);
+  $("timeRange").addEventListener("change", () => saveSettings());
+  $("schedule").addEventListener("change", () => saveSettings());
+  $("protectedOrigins").addEventListener("change", () => saveSettings());
+
+  document.querySelectorAll("[data-preset]").forEach((button) => {
+    button.addEventListener("click", () => applySelectedPreset(button.dataset.preset));
+  });
+
   $("wipeNow").addEventListener("click", wipeNow);
 }
 
@@ -136,7 +239,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireListeners();
 
   try {
-    await Promise.all([loadSettings(), refreshLastWipe()]);
+    await Promise.all([loadSettings(), refreshStatusDetails()]);
   } catch {
     setStatus("Could not load settings.", { tone: "error" });
   }
