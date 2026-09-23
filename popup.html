@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auto Wipe</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="header">
+        <div class="title">Auto Wipe</div>
+        <div class="subtitle">Minimal controls</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">What to wipe</div>
+
+        <label class="row">
+          <input type="checkbox" id="wipeHistory" />
+          <span>Browsing history</span>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="wipeCache" />
+          <span>Cache</span>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="wipeDownloads" />
+          <span>Download history</span>
+        </label>
+
+        <div class="actions">
+          <button id="wipeNow" class="btn" type="button">Wipe now</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">When to wipe</div>
+
+        <label class="row">
+          <input type="checkbox" id="triggerStartup" />
+          <span>On browser startup</span>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="triggerLastWindowClose" />
+          <span>When last window closes (best-effort)</span>
+        </label>
+
+        <div class="hint">
+          Best-effort: Chrome may shut down the extension process too quickly during exit, so this trigger is not guaranteed.
+        </div>
+      </div>
+
+      <div class="footer">
+        <div id="status" class="status" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

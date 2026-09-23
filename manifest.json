@@ -1,0 +1,29 @@
+{
+   "action": {
+      "default_icon": {
+         "128": "icons/icon128.png",
+         "16": "icons/icon16.png",
+         "32": "icons/icon32.png",
+         "48": "icons/icon48.png"
+      },
+      "default_popup": "popup.html",
+      "default_title": "Auto Wipe"
+   },
+   "background": {
+      "service_worker": "service_worker.js"
+   },
+   "description": "Wipe history, cache, and download history on startup and/or last window close.",
+   "icons": {
+      "128": "icons/icon128.png",
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyP6WYeY1fWR2zRGGTFVE1xds1DlA99VfqRit0nlhvkGfvET08FyCb5SXyE8B6U1+LFkSnhkD8KYS1Big22WaHsJauHapxGjf1Mr2My1nK5dXPYZxNdOVl0jGZqXaO9vHtJ1CXHNOy+otcMXNiK9YDjnQ3lS+IKGpYjLGkVzViG1gREBLj3niB0KK4Dco+c87pqjFzj/TtLguJe3fZeDtAIOVZdd31WaiWEEwZqDNT7IMA7V8e++8KPIW7Ozomy9mr9ezuQeueO7oaVSnjL8JtPEP8C8zqcFjboqcXpWgMKR/htrWwdH0vWt/qPcJ11kpAXtv6T4+oQplDDwGKfUwsQIDAQAB",
+   "manifest_version": 3,
+   "minimum_chrome_version": "102",
+   "name": "Auto Wipe (history, cache and download history)",
+   "permissions": [ "browsingData", "history", "downloads", "windows", "storage" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "1.0.0"
+}
