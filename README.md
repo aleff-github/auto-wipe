@@ -6,24 +6,52 @@ Everything runs locally in the browser. The extension has no backend, analytics,
 
 ## Features
 
-- Clear browsing history.
-- Clear browser cache.
-- Clear Cache Storage used by web apps.
-- Clear download history without deleting downloaded files.
+- Three presets: **Light**, **Standard**, and **Full**.
+- Clear browsing history and download history.
+- Clear cache and Cache Storage.
+- Optionally clear cookies, Local Storage, IndexedDB, and service workers.
 - Choose a time range: last hour, last 24 hours, last 7 days, or all time.
+- Protect up to 50 website origins from supported cache/cookie/site-storage cleanup.
 - Run automatically on browser startup.
+- Schedule cleanup hourly, daily, or weekly.
 - Best-effort cleanup when the last browser window closes.
 - Run a manual wipe from the popup.
-- See when the last wipe ran.
+- See the last wipe and the next scheduled wipe.
 - Light and dark mode.
 - No third-party dependencies.
+
+## Presets
+
+| Preset | Cleans |
+| --- | --- |
+| Light | Cache and Cache Storage |
+| Standard | History, cache, Cache Storage, and download history |
+| Full | Standard plus cookies, Local Storage, IndexedDB, and service workers |
+
+Presets only change the selected data categories. They do not change your time range, automatic triggers, schedule, or protected sites.
+
+## Protected sites
+
+Protected sites use Chrome's origin-exclusion support. Enter one site per line, for example:
+
+```text
+example.com
+https://mail.example.org
+```
+
+Paths are discarded and entries are stored as origins.
+
+Chrome only supports origin exclusions for cookies, cache, and site storage. **Browsing history and download history are still cleared globally** when those categories are enabled.
+
+Cookie exclusions apply to the registrable domain, which can be broader than a single subdomain.
 
 ## Permissions
 
 Auto Wipe requests only:
 
-- `browsingData` — required to remove the selected browsing data.
-- `storage` — required to save extension settings and the timestamp/result of the last wipe.
+- `browsingData` — removes the selected browsing data.
+- `storage` — saves settings and the most recent wipe status.
+- `alarms` — runs optional hourly, daily, or weekly cleanup.
 
 It does not request access to page contents, tabs, browsing URLs, downloads, or remote hosts.
 
@@ -71,7 +99,7 @@ auto-wipe/
 
 The **last window closes** trigger is best effort. Manifest V3 service workers are event-driven and Chrome may terminate extension work during browser shutdown before cleanup completes.
 
-For guaranteed cleanup while Chrome is running, use the manual action or the startup trigger.
+Scheduled cleanup uses Chrome's alarms API. Alarms do not wake a sleeping device; a missed repeating alarm runs after the device wakes and is then rescheduled.
 
 ## Security
 
