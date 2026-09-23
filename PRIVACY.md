@@ -10,28 +10,29 @@ The extension does not use analytics, advertising SDKs, remote APIs, telemetry, 
 
 ## Data stored by the extension
 
-Auto Wipe stores its settings with `chrome.storage.sync`. These settings can include:
+Both browser builds store their cleanup settings using the browser's extension storage API. Settings can include:
 
 - selected cleanup categories;
 - time range;
 - enabled automatic triggers;
-- cleanup schedule;
-- website origins the user explicitly adds to the protected-sites list.
+- cleanup schedule.
 
-Protected-site entries are configuration supplied by the user. Auto Wipe does not discover or populate this list from browsing history.
+The Chrome build can additionally store website origins the user explicitly adds to the protected-sites list. Firefox does not expose this feature because Firefox does not currently support the required `excludeOrigins` browsing-data option.
 
-Information about the most recent cleanup attempt is stored with `chrome.storage.local`. The record can contain the timestamp, trigger, selected time range, names of data categories requested for deletion, the number of protected origins, and an error message if an operation failed.
+Protected-site entries are configuration supplied by the user. Auto Wipe does not discover or populate them from browsing history.
 
-The last-wipe record does not contain browsing history entries, URLs, downloaded file names, cookies, or page contents.
+Information about the most recent cleanup attempt is stored locally. The record can contain the timestamp, trigger, selected time range, names of data categories requested for deletion, and an error message if an operation failed.
+
+The last-wipe record does not contain browsing history entries, visited URLs, downloaded file names, cookies, or page contents.
 
 ## Browser data removal
 
-When requested by the user or an enabled automatic trigger, Auto Wipe calls Chrome's `browsingData` API to remove the selected categories directly in the browser.
+When requested by the user or an enabled automatic trigger, Auto Wipe calls the browser's `browsingData` API to remove the selected categories directly in the browser.
 
-Clearing **download history** removes entries from Chrome's download list. It does not delete downloaded files from disk.
+Clearing **download history** removes entries from the browser's download list. It does not delete downloaded files from disk.
 
-Protected sites are excluded only from data categories for which Chrome supports origin exclusions: cookies, cache, Cache Storage, Local Storage, IndexedDB, and service workers. Browsing history and download history do not support this exclusion and are cleared globally when selected.
+On Chrome, protected sites are excluded only from data categories for which Chromium supports origin exclusions. Browsing history and download history are still cleared globally when selected.
 
 ## Scheduling
 
-Optional periodic cleanup uses Chrome's `alarms` API. No external service is contacted to run scheduled wipes.
+Optional periodic cleanup uses the browser's `alarms` API. No external service is contacted to run scheduled wipes.

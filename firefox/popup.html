@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auto Wipe</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="header">
+        <div>
+          <div class="title">Auto Wipe</div>
+          <div class="subtitle">Local-only browsing data cleanup · Firefox</div>
+        </div>
+        <span class="privacy-badge" title="Auto Wipe does not send your browsing data anywhere">Local</span>
+      </header>
+
+      <section class="section" aria-labelledby="preset-title">
+        <div id="preset-title" class="section-title">Presets</div>
+        <div class="preset-grid">
+          <button class="preset" type="button" data-preset="light" aria-pressed="false">
+            <strong>Light</strong>
+            <small>Cache only</small>
+          </button>
+          <button class="preset" type="button" data-preset="standard" aria-pressed="false">
+            <strong>Standard</strong>
+            <small>Everyday cleanup</small>
+          </button>
+          <button class="preset" type="button" data-preset="full" aria-pressed="false">
+            <strong>Full</strong>
+            <small>Includes site data</small>
+          </button>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="data-title">
+        <div id="data-title" class="section-title">What to wipe</div>
+
+        <label class="row">
+          <input type="checkbox" id="wipeHistory" />
+          <span>
+            <strong>Browsing history</strong>
+            <small>Visited pages and history entries</small>
+          </span>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="wipeCache" />
+          <span>
+            <strong>Cache</strong>
+            <small>Firefox browser cache</small>
+          </span>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="wipeDownloads" />
+          <span>
+            <strong>Download history</strong>
+            <small>Clears the list only — downloaded files stay on disk</small>
+          </span>
+        </label>
+
+        <details class="details">
+          <summary>Site data</summary>
+
+          <label class="row">
+            <input type="checkbox" id="wipeCookies" />
+            <span>
+              <strong>Cookies</strong>
+              <small>May sign you out of websites</small>
+            </span>
+          </label>
+
+          <label class="row">
+            <input type="checkbox" id="wipeLocalStorage" />
+            <span>
+              <strong>Local storage</strong>
+              <small>Persistent site preferences and state</small>
+            </span>
+          </label>
+
+          <label class="row">
+            <input type="checkbox" id="wipeIndexedDB" />
+            <span>
+              <strong>IndexedDB</strong>
+              <small>Structured databases stored by websites</small>
+            </span>
+          </label>
+
+          <label class="row">
+            <input type="checkbox" id="wipeServiceWorkers" />
+            <span>
+              <strong>Service workers</strong>
+              <small>Background workers registered by websites</small>
+            </span>
+          </label>
+
+          <div id="siteDataWarning" class="warning hidden">
+            Site-data cleanup can sign you out or reset local website state.
+          </div>
+        </details>
+      </section>
+
+      <section class="section grid-two" aria-labelledby="range-title">
+        <div>
+          <label id="range-title" class="section-title" for="timeRange">Time range</label>
+          <select id="timeRange" class="select">
+            <option value="hour">Last hour</option>
+            <option value="day">Last 24 hours</option>
+            <option value="week">Last 7 days</option>
+            <option value="allTime">All time</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="section-title" for="schedule">Schedule</label>
+          <select id="schedule" class="select">
+            <option value="off">Off</option>
+            <option value="hourly">Every hour</option>
+            <option value="daily">Every day</option>
+            <option value="weekly">Every week</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="trigger-title">
+        <div id="trigger-title" class="section-title">Automatic triggers</div>
+
+        <label class="row compact">
+          <input type="checkbox" id="triggerStartup" />
+          <span><strong>On browser startup</strong></span>
+        </label>
+
+        <label class="row compact">
+          <input type="checkbox" id="triggerLastWindowClose" />
+          <span>
+            <strong>When the last window closes</strong>
+            <small>Best effort: Firefox may stop extension work during shutdown</small>
+          </span>
+        </label>
+
+        <div id="nextSchedule" class="meta"></div>
+      </section>
+
+      <section class="action-card">
+        <button id="wipeNow" class="btn primary" type="button">
+          <span class="btn-label">Wipe now</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+        <div id="status" class="status" aria-live="polite"></div>
+        <div id="lastWipe" class="last-wipe"></div>
+      </section>
+    </main>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

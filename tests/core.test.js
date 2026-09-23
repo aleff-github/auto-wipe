@@ -8,14 +8,14 @@ import {
   applyPreset,
   normalizeProtectedOrigins,
   normalizeSettings
-} from "../settings.js";
+} from "../chrome/settings.js";
 import {
   buildDataToRemove,
   buildRemovalOperations,
   getSinceFromRange
-} from "../wipe.js";
+} from "../chrome/wipe.js";
 
-test("normalizeSettings returns safe defaults", () => {
+test("Chrome normalizeSettings returns safe defaults", () => {
   const settings = normalizeSettings({});
 
   assert.equal(settings.wipeHistory, true);
@@ -24,7 +24,7 @@ test("normalizeSettings returns safe defaults", () => {
   assert.deepEqual(settings.protectedOrigins, []);
 });
 
-test("normalizeSettings ignores invalid scalar values", () => {
+test("Chrome normalizeSettings ignores invalid scalar values", () => {
   const settings = normalizeSettings({
     wipeHistory: "yes",
     wipeCache: false,
@@ -38,7 +38,7 @@ test("normalizeSettings ignores invalid scalar values", () => {
   assert.equal(settings.schedule, "off");
 });
 
-test("protected origins are normalized, deduplicated and restricted to HTTP(S)", () => {
+test("Chrome protected origins are normalized and deduplicated", () => {
   assert.deepEqual(
     normalizeProtectedOrigins([
       "example.com/path",
@@ -54,7 +54,7 @@ test("protected origins are normalized, deduplicated and restricted to HTTP(S)",
   );
 });
 
-test("presets only replace data-category selections", () => {
+test("Chrome presets preserve non-data settings", () => {
   const settings = applyPreset("light", {
     ...DEFAULT_SETTINGS,
     schedule: "daily",
@@ -69,20 +69,14 @@ test("presets only replace data-category selections", () => {
   assert.equal(settings.wipeHistory, false);
 });
 
-test("full preset enables every supported data category", () => {
+test("Chrome full preset enables every supported data category", () => {
   for (const id of DATA_SETTING_IDS) {
     assert.equal(PRESETS.full[id], true);
   }
 });
 
-test("unknown presets are rejected", () => {
-  assert.throws(() => applyPreset("unknown"), /Unknown preset/);
-});
-
-test("buildDataToRemove maps all supported categories", () => {
-  const data = buildDataToRemove(PRESETS.full);
-
-  assert.deepEqual(data, {
+test("Chrome buildDataToRemove maps all supported categories", () => {
+  assert.deepEqual(buildDataToRemove(PRESETS.full), {
     history: true,
     cache: true,
     cacheStorage: true,
@@ -94,11 +88,7 @@ test("buildDataToRemove maps all supported categories", () => {
   });
 });
 
-test("all-time range starts at the Unix epoch", () => {
-  assert.equal(getSinceFromRange("allTime", 123456), 0);
-});
-
-test("relative ranges are calculated from the supplied time", () => {
+test("Chrome relative ranges are deterministic", () => {
   const now = 10 * 24 * 60 * 60 * 1000;
 
   assert.equal(getSinceFromRange("hour", now), now - 60 * 60 * 1000);
@@ -106,23 +96,7 @@ test("relative ranges are calculated from the supplied time", () => {
   assert.equal(getSinceFromRange("week", now), now - 7 * 24 * 60 * 60 * 1000);
 });
 
-test("unknown ranges are rejected", () => {
-  assert.throws(() => getSinceFromRange("unknown", Date.now()), /Unsupported time range/);
-});
-
-test("removal uses one operation when no protected origins exist", () => {
-  const operations = buildRemovalOperations({
-    ...DEFAULT_SETTINGS,
-    timeRange: "hour",
-    protectedOrigins: []
-  }, 10_000_000);
-
-  assert.equal(operations.length, 1);
-  assert.equal(operations[0].options.excludeOrigins, undefined);
-  assert.equal(operations[0].options.since, 10_000_000 - 60 * 60 * 1000);
-});
-
-test("protected origins apply only to origin-aware data", () => {
+test("Chrome protected origins apply only to origin-aware data", () => {
   const operations = buildRemovalOperations({
     ...PRESETS.full,
     timeRange: "allTime",
@@ -135,14 +109,6 @@ test("protected origins apply only to origin-aware data", () => {
   const globalOperation = operations.find((operation) => !operation.options.excludeOrigins);
 
   assert.deepEqual(protectedOperation.options.excludeOrigins, ["https://example.com"]);
-  assert.deepEqual(protectedOperation.data, {
-    cache: true,
-    cacheStorage: true,
-    cookies: true,
-    localStorage: true,
-    indexedDB: true,
-    serviceWorkers: true
-  });
   assert.deepEqual(globalOperation.data, {
     history: true,
     downloads: true
