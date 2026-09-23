@@ -33,10 +33,14 @@ async function configureSchedule(settings = null) {
   const periodInMinutes = SCHEDULE_MINUTES[resolved.schedule];
   if (!periodInMinutes) return null;
 
-  chrome.alarms.create(AUTO_WIPE_ALARM, {
+  const creation = chrome.alarms.create(AUTO_WIPE_ALARM, {
     delayInMinutes: periodInMinutes,
     periodInMinutes
   });
+
+  if (creation && typeof creation.then === "function") {
+    await creation;
+  }
 
   return chrome.alarms.get(AUTO_WIPE_ALARM);
 }

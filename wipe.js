@@ -49,7 +49,7 @@ export function buildRemovalOperations(settings, now = Date.now()) {
     return [];
   }
 
-  const since = getSinceFromRange(settings.timeRange);
+  const since = getSinceFromRange(settings.timeRange, now);
   const protectedOrigins = Array.isArray(settings.protectedOrigins)
     ? settings.protectedOrigins
     : [];
