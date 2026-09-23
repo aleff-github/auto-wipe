@@ -1,69 +1,143 @@
-const DEFAULT_SETTINGS = {
-  wipeHistory: true,
-  wipeCache: true,
-  wipeDownloads: true,
-  triggerStartup: true,
-  triggerLastWindowClose: true
-};
+import { DEFAULT_SETTINGS, SETTING_IDS, normalizeSettings } from "./settings.js";
 
-const ids = [
-  "wipeHistory",
-  "wipeCache",
-  "wipeDownloads",
-  "triggerStartup",
-  "triggerLastWindowClose"
-];
+let statusTimer = null;
 
 function $(id) {
   return document.getElementById(id);
 }
 
-function setStatus(msg) {
-  $("status").textContent = msg;
-  if (msg) setTimeout(() => setStatus(""), 1400);
+function setStatus(message, { clearAfter = 0, tone = "neutral" } = {}) {
+  if (statusTimer) {
+    clearTimeout(statusTimer);
+    statusTimer = null;
+  }
+
+  const status = $("status");
+  status.textContent = message;
+  status.dataset.tone = tone;
+
+  if (message && clearAfter > 0) {
+    statusTimer = setTimeout(() => {
+      status.textContent = "";
+      status.dataset.tone = "neutral";
+      statusTimer = null;
+    }, clearAfter);
+  }
+}
+
+function selectedDataCount() {
+  return ["wipeHistory", "wipeCache", "wipeCacheStorage", "wipeDownloads"]
+    .filter((id) => $(id).checked).length;
+}
+
+function updateButtonState() {
+  $("wipeNow").disabled = selectedDataCount() === 0;
+}
+
+function formatLastWipe(lastWipe) {
+  if (!lastWipe?.at) {
+    return "No wipe recorded yet.";
+  }
+
+  const when = new Date(lastWipe.at).toLocaleString();
+
+  if (!lastWipe.ok) {
+    return `Last attempt failed · ${when}`;
+  }
+
+  if (!lastWipe.wiped?.length) {
+    return `Last run: nothing selected · ${when}`;
+  }
+
+  return `Last wipe · ${when}`;
+}
+
+async function refreshLastWipe() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_STATUS" });
+    $("lastWipe").textContent = formatLastWipe(response?.lastWipe);
+  } catch {
+    $("lastWipe").textContent = "";
+  }
 }
 
 async function loadSettings() {
-  const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
-  for (const id of ids) {
-    $(id).checked = Boolean(settings[id]);
+  const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  const settings = normalizeSettings(stored);
+
+  for (const id of SETTING_IDS) {
+    $(id).checked = settings[id];
   }
+
+  $("timeRange").value = settings.timeRange;
+  updateButtonState();
 }
 
 async function saveSettings() {
-  const settings = {};
-  for (const id of ids) {
-    settings[id] = $(id).checked;
+  const next = {};
+
+  for (const id of SETTING_IDS) {
+    next[id] = $(id).checked;
   }
-  await chrome.storage.sync.set(settings);
-  setStatus("Saved.");
+
+  next.timeRange = $("timeRange").value;
+
+  try {
+    await chrome.storage.sync.set(normalizeSettings(next));
+    setStatus("Settings saved.", { clearAfter: 1400 });
+  } catch {
+    setStatus("Could not save settings.", { clearAfter: 3000, tone: "error" });
+  }
+
+  updateButtonState();
+}
+
+function setWiping(isWiping) {
+  const button = $("wipeNow");
+  button.classList.toggle("loading", isWiping);
+  button.disabled = isWiping || selectedDataCount() === 0;
+  button.setAttribute("aria-busy", String(isWiping));
+}
+
+async function wipeNow() {
+  setWiping(true);
+  setStatus("Wiping selected data…");
+
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "WIPE_NOW" });
+
+    if (result?.ok) {
+      const count = result.wiped?.length ?? 0;
+      setStatus(
+        count > 0 ? `Wipe completed · ${count} data type${count === 1 ? "" : "s"} cleared.` : "Nothing selected to wipe.",
+        { clearAfter: 3500, tone: "success" }
+      );
+      await refreshLastWipe();
+    } else {
+      setStatus("Wipe failed.", { clearAfter: 4000, tone: "error" });
+    }
+  } catch {
+    setStatus("Wipe failed.", { clearAfter: 4000, tone: "error" });
+  } finally {
+    setWiping(false);
+  }
 }
 
 function wireListeners() {
-  for (const id of ids) {
+  for (const id of SETTING_IDS) {
     $(id).addEventListener("change", saveSettings);
   }
 
-  $("wipeNow").addEventListener("click", async () => {
-    $("wipeNow").disabled = true;
-    setStatus("Wiping...");
-
-    try {
-      const result = await chrome.runtime.sendMessage({ type: "WIPE_NOW" });
-      if (result && result.ok) {
-        setStatus("Wipe completed.");
-      } else {
-        setStatus("Wipe failed.");
-      }
-    } catch (e) {
-      setStatus("Wipe failed.");
-    } finally {
-      $("wipeNow").disabled = false;
-    }
-  });
+  $("timeRange").addEventListener("change", saveSettings);
+  $("wipeNow").addEventListener("click", wipeNow);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadSettings();
   wireListeners();
+
+  try {
+    await Promise.all([loadSettings(), refreshLastWipe()]);
+  } catch {
+    setStatus("Could not load settings.", { tone: "error" });
+  }
 });

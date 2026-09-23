@@ -7,58 +7,88 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="wrap">
-      <div class="header">
-        <div class="title">Auto Wipe</div>
-        <div class="subtitle">Minimal controls</div>
-      </div>
+    <main class="wrap">
+      <header class="header">
+        <div>
+          <div class="title">Auto Wipe</div>
+          <div class="subtitle">Local-only browsing data cleanup</div>
+        </div>
+        <span class="privacy-badge" title="Auto Wipe does not send your browsing data anywhere">Local</span>
+      </header>
 
-      <div class="section">
-        <div class="section-title">What to wipe</div>
+      <section class="section" aria-labelledby="data-title">
+        <div id="data-title" class="section-title">What to wipe</div>
 
         <label class="row">
           <input type="checkbox" id="wipeHistory" />
-          <span>Browsing history</span>
+          <span>
+            <strong>Browsing history</strong>
+            <small>Visited pages and history entries</small>
+          </span>
         </label>
 
         <label class="row">
           <input type="checkbox" id="wipeCache" />
-          <span>Cache</span>
+          <span>
+            <strong>Cache</strong>
+            <small>Temporary browser cache</small>
+          </span>
+        </label>
+
+        <label class="row">
+          <input type="checkbox" id="wipeCacheStorage" />
+          <span>
+            <strong>Cache storage</strong>
+            <small>Cached data used by web apps</small>
+          </span>
         </label>
 
         <label class="row">
           <input type="checkbox" id="wipeDownloads" />
-          <span>Download history</span>
+          <span>
+            <strong>Download history</strong>
+            <small>Clears the list only — downloaded files stay on disk</small>
+          </span>
         </label>
+      </section>
 
-        <div class="actions">
-          <button id="wipeNow" class="btn" type="button">Wipe now</button>
-        </div>
-      </div>
+      <section class="section" aria-labelledby="range-title">
+        <label id="range-title" class="section-title" for="timeRange">Time range</label>
+        <select id="timeRange" class="select">
+          <option value="hour">Last hour</option>
+          <option value="day">Last 24 hours</option>
+          <option value="week">Last 7 days</option>
+          <option value="allTime">All time</option>
+        </select>
+      </section>
 
-      <div class="section">
-        <div class="section-title">When to wipe</div>
+      <section class="section" aria-labelledby="trigger-title">
+        <div id="trigger-title" class="section-title">Automatic wipe</div>
 
-        <label class="row">
+        <label class="row compact">
           <input type="checkbox" id="triggerStartup" />
-          <span>On browser startup</span>
+          <span><strong>On browser startup</strong></span>
         </label>
 
-        <label class="row">
+        <label class="row compact">
           <input type="checkbox" id="triggerLastWindowClose" />
-          <span>When last window closes (best-effort)</span>
+          <span>
+            <strong>When the last window closes</strong>
+            <small>Best effort: Chrome may stop the extension during shutdown</small>
+          </span>
         </label>
+      </section>
 
-        <div class="hint">
-          Best-effort: Chrome may shut down the extension process too quickly during exit, so this trigger is not guaranteed.
-        </div>
-      </div>
-
-      <div class="footer">
+      <section class="action-card">
+        <button id="wipeNow" class="btn primary" type="button">
+          <span class="btn-label">Wipe now</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
         <div id="status" class="status" aria-live="polite"></div>
-      </div>
-    </div>
+        <div id="lastWipe" class="last-wipe"></div>
+      </section>
+    </main>
 
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

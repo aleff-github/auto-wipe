@@ -1,95 +1,136 @@
-// Auto Wipe - Manifest V3 service worker
-// Wipes selected browsing data on selected triggers, plus on-demand via popup.
+import { DEFAULT_SETTINGS, normalizeSettings } from "./settings.js";
+import { buildDataToRemove, getSinceFromRange } from "./wipe.js";
 
-const DEFAULT_SETTINGS = {
-  wipeHistory: true,
-  wipeCache: true,
-  wipeDownloads: true,
-  triggerStartup: true,
-  triggerLastWindowClose: true
-};
+let activeWipe = null;
 
 async function getSettings() {
   const stored = await chrome.storage.sync.get(DEFAULT_SETTINGS);
-  return { ...DEFAULT_SETTINGS, ...stored };
+  return normalizeSettings(stored);
 }
 
-function buildDataToRemove(settings) {
-  const data = {};
-
-  if (settings.wipeHistory) data.history = true;
-  if (settings.wipeDownloads) data.downloads = true;
-
-  if (settings.wipeCache) {
-    data.cache = true;
-    data.cacheStorage = true;
-  }
-
-  return data;
+async function persistWipeResult(result) {
+  await chrome.storage.local.set({
+    lastWipe: {
+      at: Date.now(),
+      ...result
+    }
+  });
 }
 
-async function wipeSelected(reason) {
+async function performWipe(reason) {
   const settings = await getSettings();
   const dataToRemove = buildDataToRemove(settings);
+  const wiped = Object.keys(dataToRemove);
 
-  if (!Object.keys(dataToRemove).length) {
-    console.log(`[AutoWipe] Nothing selected to wipe (${reason}).`);
-    return { ok: true, reason, wiped: [] };
+  if (wiped.length === 0) {
+    const result = {
+      ok: true,
+      reason,
+      wiped: [],
+      timeRange: settings.timeRange
+    };
+    await persistWipeResult(result);
+    return result;
   }
 
-  await chrome.browsingData.remove({ since: 0 }, dataToRemove);
-  console.log(`[AutoWipe] Wipe completed (${reason}).`, dataToRemove);
+  const since = getSinceFromRange(settings.timeRange);
+  await chrome.browsingData.remove({ since }, dataToRemove);
 
-  return { ok: true, reason, wiped: Object.keys(dataToRemove) };
+  const result = {
+    ok: true,
+    reason,
+    wiped,
+    timeRange: settings.timeRange
+  };
+
+  await persistWipeResult(result);
+  console.info("[AutoWipe] Wipe completed.", result);
+  return result;
 }
 
-// Initialize defaults on install (only if not already set)
-chrome.runtime.onInstalled.addListener(async () => {
-  const current = await chrome.storage.sync.get(null);
-  if (!current || Object.keys(current).length === 0) {
-    await chrome.storage.sync.set(DEFAULT_SETTINGS);
+function wipeSelected(reason) {
+  if (activeWipe) {
+    return activeWipe;
   }
+
+  activeWipe = performWipe(reason)
+    .catch(async (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[AutoWipe] Wipe failed (${reason}):`, error);
+      await chrome.storage.local.set({
+        lastWipe: {
+          at: Date.now(),
+          ok: false,
+          reason,
+          error: message
+        }
+      });
+      throw error;
+    })
+    .finally(() => {
+      activeWipe = null;
+    });
+
+  return activeWipe;
+}
+
+chrome.runtime.onInstalled.addListener(async () => {
+  const current = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+  await chrome.storage.sync.set(normalizeSettings(current));
 });
 
-// Trigger: browser startup
 chrome.runtime.onStartup.addListener(async () => {
   const settings = await getSettings();
-  if (settings.triggerStartup) {
-    try {
-      await wipeSelected("onStartup");
-    } catch (err) {
-      console.warn("[AutoWipe] Wipe failed (onStartup):", err);
-    }
+  if (!settings.triggerStartup) return;
+
+  try {
+    await wipeSelected("startup");
+  } catch {
+    // Failure is logged and persisted by wipeSelected.
   }
 });
 
-// Trigger: best-effort when last window closes
 chrome.windows.onRemoved.addListener(async () => {
   const settings = await getSettings();
   if (!settings.triggerLastWindowClose) return;
 
   try {
     const remaining = await chrome.windows.getAll();
-    if (!remaining || remaining.length === 0) {
+    if (remaining.length === 0) {
       await wipeSelected("lastWindowClosed");
     }
-  } catch (err) {
-    console.warn("[AutoWipe] Failed checking remaining windows:", err);
+  } catch (error) {
+    console.warn("[AutoWipe] Failed checking remaining windows:", error);
   }
 });
 
-// On-demand wipe triggered from the popup
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg && msg.type === "WIPE_NOW") {
-    (async () => {
-      try {
-        const result = await wipeSelected("wipeNow");
-        sendResponse(result);
-      } catch (err) {
-        console.warn("[AutoWipe] Wipe failed (wipeNow):", err);
-        sendResponse({ ok: false, error: String(err) });
-      }
-    })();
-    return true; // keep the message channel open for async response
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "WIPE_NOW") {
+    wipeSelected("manual")
+      .then(sendResponse)
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
+
+    return true;
   }
+
+  if (message?.type === "GET_STATUS") {
+    chrome.storage.local
+      .get("lastWipe")
+      .then(({ lastWipe }) => sendResponse({ ok: true, lastWipe: lastWipe ?? null }))
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
+
+    return true;
+  }
+
+  return false;
 });
